@@ -2,18 +2,6 @@
 #include <Adafruit_SSD1306.h>
 #include <DHT.h>
 
-/*
-Pins
-BTN1 = 33
-BTN2 = 32
-Pot = 14
-LED = 12
-Ultrasonic = 5 / 18
-OLED = I2C (21 / 22)
-DHT = 4
-*/
-
-// -------- OLED --------
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 
 // -------- Pins --------
@@ -31,7 +19,13 @@ const int echoPin = 18;
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
 
-// -------- Ultrasonic --------
+// -------- Mode --------
+int mode = 0;
+
+// -------- Button states --------
+bool lastB1 = 0;
+bool lastB2 = 0;
+
 long duration;
 float distance;
 
@@ -41,6 +35,7 @@ void setup() {
   pinMode(btn1, INPUT_PULLDOWN);
   pinMode(btn2, INPUT_PULLDOWN);
 
+  pinMode(ledPin, OUTPUT);
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
 
@@ -50,8 +45,6 @@ void setup() {
   display.clearDisplay();
 
   dht.begin();
-
-  pinMode(ledPin, OUTPUT);
 }
 
 void loop() {
@@ -59,49 +52,63 @@ void loop() {
   bool b1 = digitalRead(btn1);
   bool b2 = digitalRead(btn2);
 
+  // -------- detect NEW press (edge) --------
+  if (b1 && !lastB1) {
+    mode = 1;
+    Serial.println("Mode 1: DHT");
+  }
+
+  if (b2 && !lastB2) {
+    mode = 2;
+    Serial.println("Mode 2: Pot");
+  }
+
+  if (b1 && b2 && (!lastB1 || !lastB2)) {
+    mode = 3;
+    Serial.println("Mode 3: Distance");
+  }
+
+  lastB1 = b1;
+  lastB2 = b2;
+
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
 
-  // ================= MODE 1: DHT =================
-  if (b1 && !b2) {
-
+  // ================= MODE 1 =================
+  if (mode == 1) {
     float t = dht.readTemperature();
     float h = dht.readHumidity();
 
     display.setCursor(0, 10);
-    display.print("TEMP/HUM MODE");
+    display.print("TEMP / HUM");
 
-    display.setCursor(0, 25);
-    display.print("Temp: ");
-    if (!isnan(t)) display.print(t);
-    else display.print("N/A");
+    display.setCursor(0, 30);
+    display.print("T: ");
+    display.print(t);
 
-    display.setCursor(0, 40);
-    display.print("Hum: ");
-    if (!isnan(h)) display.print(h);
-    else display.print("N/A");
+    display.setCursor(0, 45);
+    display.print("H: ");
+    display.print(h);
   }
 
-  // ================= MODE 2: POT + LED =================
-  else if (b2 && !b1) {
-
+  // ================= MODE 2 =================
+  else if (mode == 2) {
     int pot = analogRead(potPin);
-    int brightness = map(pot, 0, 4095, 0, 255);
+    int pwm = map(pot, 0, 4095, 0, 255);
 
-    analogWrite(ledPin, brightness);
+    analogWrite(ledPin, pwm);
 
     display.setCursor(0, 10);
     display.print("POT MODE");
 
     display.setCursor(0, 30);
     display.print("LED: ");
-    display.print(brightness);
+    display.print(pwm);
   }
 
-  // ================= MODE 3: DISTANCE =================
-  else if (b1 && b2) {
-
+  // ================= MODE 3 =================
+  else if (mode == 3) {
     digitalWrite(trigPin, LOW);
     delayMicroseconds(2);
     digitalWrite(trigPin, HIGH);
@@ -117,17 +124,10 @@ void loop() {
     display.print("DIST MODE");
 
     display.setCursor(0, 30);
-    display.print("Dist: ");
     display.print(distance);
     display.print(" cm");
   }
 
-  // ================= NONE =================
-  else {
-    display.setCursor(0, 25);
-    display.print("Hold button 1 or 2");
-  }
-
   display.display();
-  delay(200);
+  delay(100);
 }
