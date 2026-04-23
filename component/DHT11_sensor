@@ -1,0 +1,19 @@
+#include <DHT.h>
+
+DHT dht11(21, DHT11);
+
+void setup() {
+  Serial.begin(115200);
+  dht11.begin();
+}
+
+void loop() {
+  float temperature = dht11.readTemperature();
+  float humidity = dht11.readHumidity();
+
+  if (isnan(temperature) || isnan(humidity)) {
+    Serial.println("failed to retreieve data from sensors!");
+  } else {
+    Serial.printf("Temperature: %.1f C\tHumidity: %.1f%%\n", temperature, humidity);
+  }
+}
