@@ -1,0 +1,133 @@
+#include <Wire.h>
+#include <Adafruit_SSD1306.h>
+#include <DHT.h>
+
+/*
+Pins
+BTN1 = 33
+BTN2 = 32
+Pot = 14
+LED = 12
+Ultrasonic = 5 / 18
+OLED = I2C (21 / 22)
+DHT = 4
+*/
+
+// -------- OLED --------
+Adafruit_SSD1306 display(128, 64, &Wire, -1);
+
+// -------- Pins --------
+const int btn1 = 33;
+const int btn2 = 32;
+
+const int potPin = 14;
+const int ledPin = 12;
+
+const int trigPin = 5;
+const int echoPin = 18;
+
+// -------- DHT --------
+#define DHTPIN 4
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+// -------- Ultrasonic --------
+long duration;
+float distance;
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(btn1, INPUT_PULLDOWN);
+  pinMode(btn2, INPUT_PULLDOWN);
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  Wire.begin(21, 22);
+
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+
+  dht.begin();
+
+  pinMode(ledPin, OUTPUT);
+}
+
+void loop() {
+
+  bool b1 = digitalRead(btn1);
+  bool b2 = digitalRead(btn2);
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  // ================= MODE 1: DHT =================
+  if (b1 && !b2) {
+
+    float t = dht.readTemperature();
+    float h = dht.readHumidity();
+
+    display.setCursor(0, 10);
+    display.print("TEMP/HUM MODE");
+
+    display.setCursor(0, 25);
+    display.print("Temp: ");
+    if (!isnan(t)) display.print(t);
+    else display.print("N/A");
+
+    display.setCursor(0, 40);
+    display.print("Hum: ");
+    if (!isnan(h)) display.print(h);
+    else display.print("N/A");
+  }
+
+  // ================= MODE 2: POT + LED =================
+  else if (b2 && !b1) {
+
+    int pot = analogRead(potPin);
+    int brightness = map(pot, 0, 4095, 0, 255);
+
+    analogWrite(ledPin, brightness);
+
+    display.setCursor(0, 10);
+    display.print("POT MODE");
+
+    display.setCursor(0, 30);
+    display.print("LED: ");
+    display.print(brightness);
+  }
+
+  // ================= MODE 3: DISTANCE =================
+  else if (b1 && b2) {
+
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+
+    duration = pulseIn(echoPin, HIGH, 30000);
+
+    if (duration == 0) distance = -1;
+    else distance = duration * 0.0343 / 2;
+
+    display.setCursor(0, 10);
+    display.print("DIST MODE");
+
+    display.setCursor(0, 30);
+    display.print("Dist: ");
+    display.print(distance);
+    display.print(" cm");
+  }
+
+  // ================= NONE =================
+  else {
+    display.setCursor(0, 25);
+    display.print("Hold button 1 or 2");
+  }
+
+  display.display();
+  delay(200);
+}
