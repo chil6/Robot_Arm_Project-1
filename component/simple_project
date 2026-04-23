@@ -1,0 +1,115 @@
+#include <Wire.h>
+#include <Adafruit_SSD1306.h>
+#include <DHT.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// -------- Ultrasonic --------
+const int trigPin = 5;
+const int echoPin = 18;
+long duration;
+float distance;
+
+// -------- DHT11 --------
+#define DHTPIN 4
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  Wire.begin(21, 22);
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED FAIL");
+    while (true);
+  }
+
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+
+  dht.begin();
+}
+
+void loop() {
+
+  // -------- Ultrasonic --------
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH, 30000);
+
+  if (duration == 0) distance = -1;
+  else distance = duration * 0.0343 / 2;
+
+  // -------- DHT11 --------
+  float temp = dht.readTemperature();
+  float hum = dht.readHumidity();
+
+  bool tOK = !isnan(temp);
+  bool hOK = !isnan(hum);
+
+  // -------- Status --------
+  String status;
+  if (distance < 0) status = "No signal";
+  else if (distance < 10) status = "Close";
+  else if (distance < 50) status = "Reachable";
+  else status = "Far";
+
+  // -------- SERIAL --------
+  Serial.print("Dist: ");
+  Serial.print(distance);
+  Serial.print(" cm | ");
+
+  Serial.print("Temp: ");
+  if (tOK) Serial.print(temp);
+  else Serial.print("N/A");
+
+  Serial.print(" C | Hum: ");
+  if (hOK) Serial.print(hum);
+  else Serial.print("N/A");
+
+  Serial.print(" % | Status: ");
+  Serial.println(status);
+
+  // -------- OLED --------
+  display.clearDisplay();
+
+  display.setTextSize(1);
+
+  // Line 1
+  display.setCursor(0, 0);
+  display.print("Dist: ");
+  display.print(distance);
+  display.print(" cm");
+
+  // Line 2 (status)
+  display.setCursor(0, 15);
+  display.print(status);
+
+  // Line 3
+  display.setCursor(0, 32);
+  display.print("Temp: ");
+  if (tOK) display.print(temp);
+  else display.print("N/A");
+
+  // Line 4
+  display.setCursor(0, 49);
+  display.print("Hum: ");
+  if (hOK) display.print(hum);
+  else display.print("N/A");
+
+  display.display();
+
+  delay(2000); // important for DHT11
+}
